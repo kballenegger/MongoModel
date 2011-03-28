@@ -15,13 +15,31 @@ require_once 'model.php';
 
 class Example extends MongoModel {
 	
-	// You must tell it which collection to use.
-	// (Future versions of MongoModel might set a sensible default here.)
-	public static $_collection = 'examples';
+	// In this case will MongoModel will by default use the connection 'examples,' which it extrapolates from the class name.
+	
+	// You can, however, choose another collection by setting $_collection
+	public static $_collection = 'test_collection';
 	
 	// Feel free to add any methods to the class.
 	
-	// MongoDB is schema-agnostic, so you do not need to define your schema. No migrations, woohoo!	
+	// MongoDB is schema-agnostic, so you do not need to define your schema. No migrations, woohoo!
+	// Any requirements should be defined using validations.
+	
+	// Validations: implement the validate() method
+	// Validations will be checked everytime save is called.
+	public function validate() {
+		parent::validate(); // Always call parent.
+		
+		// You can write your own validations here.
+		// Test whatever you need, and if something goes wrong, add an error to $this->_errors[$key]
+		
+		if (!is_numeric($this->_data['numberfield']))
+			$this->_errors['numberfield'] = 'numberfield must be numeric';
+		
+		// Or use one of the handy presets
+		$this->validate_presence_of('textfield');
+		// Check out also, validate_relationship.
+	}
 }
 
 
@@ -35,13 +53,14 @@ $example_1 = Example::add(array(
 		'numberfield' => 1234,
 		'arrayfield' => array(1, 2, 3, 4),
 		'hashfield' => array('one' => 1, 'two' => 2)
-	));
+	)); // Saved to the database straight away
 // Another method
-$example_2 = new Example;
+$example_2 = new Example; // Not saved until save() is called
 $example_2->textfield = 'something';
 $example_2->numberfield = 4567;
 $example_2->arrayfield = array(1, 2, 3, 4);
 $example_2->hashfield = array('one' => 1, 'two' => 2);
+$example_2->save();
 
 var_dump($example_2->_id); // `_id` contains a MongoID.
 var_dump($example_2->id); // `id` is the string representation of the Mongo ID.
@@ -62,6 +81,13 @@ $example_5 = Example::find_one(array('id' => $example_2->id, 'textfield' => 'som
 $example_6 = Example::find_by_id($example_2->id);
 
 // Modifying objects
-$example_6->textfield = 'something else'; // Any change you make is automatically saved. That's all you need to know.
+$example_6->textfield = 'something else';
+$example_6->save();
 
+// Relationships are automatically converted to ids.
+$example_6->objectfield = $example_2;
+var_dump($example_6->objectfield); // String id.
+
+$example_7 = Example::find_by_id($example_6->objectfield); // To retrieve the object, use the finder.
+var_dump($example_7);
 

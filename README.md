@@ -20,13 +20,8 @@ MongoModel is a simple and lightweight ORM for MongoDB and PHP.
     
     class Example extends MongoModel {
     	
-    	// You must tell it which collection to use.
-    	// (Future versions of MongoModel might set a sensible default here.)
-    	public static $_collection = 'examples';
-    	
-    	// Feel free to add any methods to the class.
-    	
-    	// MongoDB is schema-agnostic, so you do not need to define your schema. No migrations, woohoo!	
+    	// You're not required to define anything. MongoModel will detect what you need automatically.
+    	// However if you need more control, there are more advanced examples in sample.php.
     }
     
     
@@ -41,12 +36,12 @@ MongoModel is a simple and lightweight ORM for MongoDB and PHP.
     		'arrayfield' => array(1, 2, 3, 4),
     		'hashfield' => array('one' => 1, 'two' => 2)
     	));
+    
     // Another method
     $example_2 = new Example;
     $example_2->textfield = 'something';
     $example_2->numberfield = 4567;
-    $example_2->arrayfield = array(1, 2, 3, 4);
-    $example_2->hashfield = array('one' => 1, 'two' => 2);
+    $example_2->save();
     
     var_dump($example_2->_id); // `_id` contains a MongoID.
     var_dump($example_2->id); // `id` is the string representation of the Mongo ID.
@@ -73,6 +68,7 @@ MongoModel is a simple and lightweight ORM for MongoDB and PHP.
     
 ### Modifying objects
     $example_6->textfield = 'something else'; 
-    // Any change you make is automatically saved. That's all you need to know.
-    
+    $example_6->save();
+
+**Check out sample.php for more detailed examples.**
 
