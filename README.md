@@ -54,19 +54,25 @@ MongoModel is a simple and lightweight ORM for MongoDB and PHP.
 ### Querying objects
     
     // Find many
-    $examples_3 = Example::find_many(array('textfield' => 'something')); // Use any type of Mongo query here. See Mongo docs for more examples.
+    $examples_3 = Example::find_many(array('textfield' => 'something'));
+    // Use any type of Mongo query here. See Mongo docs for more examples.
+    
     var_dump($examples_3); // Is an array of Example objects.
     
     // Find one
-    $example_4 = Example::find_one(array('numberfield' => 4567)); // If more than one match exist, the first one is returned.
+    $example_4 = Example::find_one(array('numberfield' => 4567));
+    // If more than one match exist, the first one is returned.
+    
     var_dump($example_4); // Is an Example object.
     
-    $example_5 = Example::find_one(array('id' => $example_2->id, 'textfield' => 'something')); // If you use `id` in a query, MongoModel will automatically translate it to `_id` as a MongoID object.
+    $example_5 = Example::find_one(array('id' => $example_2->id, 'textfield' => 'something'));
+    // If you use `id` in a query, MongoModel will automatically translate it to `_id` as a MongoID object.
     
     // Find by ID
     $example_6 = Example::find_by_id($example_2->id);
     
 ### Modifying objects
-    $example_6->textfield = 'something else'; // Any change you make is automatically saved. That's all you need to know.
+    $example_6->textfield = 'something else'; 
+    // Any change you make is automatically saved. That's all you need to know.
     
 
