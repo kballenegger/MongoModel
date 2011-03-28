@@ -171,6 +171,7 @@ abstract class MongoModel {
 			else
 				$this->_data['date_modified'] = time();
 			$collection->save($this->_data);
+			return true;
 		} else {
 			return false;
 		}
