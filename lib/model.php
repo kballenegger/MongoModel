@@ -9,6 +9,7 @@
 */
 
 define('MONGOMODEL_PATH', dirname(__FILE__).'/');
+define('MONGOMODEL_SAVE_IMPLICITLY', false)
 
 /*
  *
@@ -385,7 +386,8 @@ abstract class MongoModel {
 		} else {
 			$this->_data[$key] = $value;
 		}
-		//$this->save();
+		if (MONGOMODEL_SAVE_IMPLICITLY)
+			$this->save();
 	}
 	
 	// only works one level deep
