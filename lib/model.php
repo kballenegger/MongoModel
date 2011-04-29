@@ -248,23 +248,6 @@ abstract class MongoModel {
 		}
 	}
 	
-	public static function require_find_by_id($id) {
-		$object = self::find_by_id($id);
-		
-		if (!$object) {
-			respond_status(404, 'Object '.$id.' not found!');
-		}
-		
-		return $object;
-	}
-	
-	public static function find_many_not_id($id, $query=array(), $sort=null) {
-		if ($id) {
-			$query['_id'] = array('$ne' => new MongoID($id));
-			return self::find_many($query, $sort);
-		}
-	}
-	
 	public static function count($query = null) {
 		$class = get_called_class();
 		$collection = $class::_get_collection();
