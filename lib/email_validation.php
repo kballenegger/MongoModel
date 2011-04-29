@@ -1,5 +1,7 @@
 <?php
 
+define('_EMAIL_VALIDATION', true);
+
 /*
 	Validate an email address.
 	Provide email address (raw input)

@@ -8,9 +8,22 @@
 
 */
 
-require_once dirname(__FILE__).'/lib/case_conversion.php';
-require_once dirname(__FILE__).'/lib/email_validation.php';
-require_once dirname(__FILE__).'/lib/hash.php';
+define('MONGOMODEL_PATH', dirname(__FILE__).'/');
+
+/*
+ *
+ * ------------ DO NOT EDIT ANYTHING BELOW THIS LINE ------------
+ *
+ */
+
+define('_MONGOMODEL', true);
+
+if (!defined('_CASE_CONVERSION'))
+	require_once MONGOMODEL_PATH.'case_conversion.php';
+if (!defined('_EMAIL_VALIDATION'))
+	require_once MONGOMODEL_PATH.'email_validation.php';
+if (!defined('_HASH'))
+	require_once MONGOMODEL_PATH.'hash.php';
 
 class MongoModel_OneToManyRelationship implements Iterator {
 	public $ids = array();

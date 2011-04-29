@@ -8,7 +8,7 @@ $mongo_database = 'test';
 $mongo = new Mongo($mongo_host.':'.$mongo_port);
 $GLOBALS['db'] = $mongo->{$mongo_database};
 
-require_once 'model.php';
+require_once 'lib/model.php';
 
 
 // This is how you write a model.

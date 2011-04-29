@@ -1,7 +1,19 @@
 <?php
 
-require_once dirname(__FILE__).'/case_conversion.php';
-require_once dirname(__FILE__).'/colorize_output.php';
+define('TEST_PATH', dirname(__FILE__).'/');
+
+/*
+ *
+ * ------------ DO NOT EDIT ANYTHING BELOW THIS LINE ------------
+ *
+ */
+
+define('_TEST', true);
+
+if (!defined('_CASE_CONVERSION'))
+	require_once TEST_PATH.'case_conversion.php';
+if (!defined('_TERMINAL_COLOR'))
+	require_once TEST_PATH.'terminal_color.php';
 
 class TestError extends Exception {}
 
@@ -122,10 +134,10 @@ abstract class Tester {
 		
 		$success = true;
 		
-		if ($handle = opendir(dirname(__FILE__).'/../tests')) {
+		if ($handle = opendir($GLOBALS['tests_path'])) {
 			while (false !== ($file = readdir($handle))) {
 				if (preg_match('/^([a-z]+)\.php$/', $file, $matches)) {
-					require_once dirname(__FILE__).'/../tests/'.$file;
+					require_once $GLOBALS['tests_path'].$file;
 					$class = underscore_to_camel_case($matches[1]).'Tester';
 					$success *= $class::test();
 					echo "\n".'---'."\n\n";

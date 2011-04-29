@@ -1,7 +1,6 @@
 <?php
 
-require_once dirname(__FILE__).'/../lib/test.php';
-require_once dirname(__FILE__).'/../model.php';
+require_once dirname(__FILE__).'/../../lib/model.php';
 
 class TestModel extends MongoModel {
 

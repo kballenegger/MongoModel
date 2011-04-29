@@ -1,7 +1,6 @@
 <?php
 
-require_once dirname(__FILE__).'/../lib/test.php';
-require_once dirname(__FILE__).'/../lib/hash.php';
+require_once dirname(__FILE__).'/../../lib/hash.php';
 
 class HashTester extends Tester {
 	
