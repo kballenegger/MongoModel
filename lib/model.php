@@ -9,7 +9,7 @@
 */
 
 define('MONGOMODEL_PATH', dirname(__FILE__).'/');
-define('MONGOMODEL_SAVE_IMPLICITLY', false)
+define('MONGOMODEL_SAVE_IMPLICITLY', false);
 
 /*
  *
