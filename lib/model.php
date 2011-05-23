@@ -55,16 +55,22 @@ class MongoModel_OneToManyRelationship implements Iterator {
 		if ($object instanceof $this->to) {
 			$this->from->array_push($this->key, $object->id);
 			return $this->from->save();
-		} else
+		} else {
 			return false;
+		}
 	}
 	
 	public function delete($object) {
 		if ($object instanceof $this->to) {
 			$this->from->array_unset_value($this->key, $object->id);
 			$this->from->save();
-		} else
+		} else {
 			return false;
+		}
+	}
+	
+	public function count() {
+		return count($this->ids);
 	}
 	
 	// Iterator Interface
@@ -131,6 +137,7 @@ abstract class MongoModel {
 	protected static $_has_many = array();
 	protected static $_has_many_to_many = array();
 	protected static $_has_one = array();
+	protected static $_has_one_to_one = array();
 	protected static $_defined = false;
 	
 	// non-static
@@ -176,13 +183,17 @@ abstract class MongoModel {
 		$class = get_called_class();
 		$class::$_has_one[$key] = $target;
 	}
+	protected static function has_one_to_one($key, $target, $foreign_key) {
+		$class = get_called_class();
+		$class::$_has_one_to_one[$key] = Hash::create(array('key' => $foreign_key, 'target' => $target));
+	}
 	protected static function has_many($key, $target) {
 		$class = get_called_class();
 		$class::$_has_many[$key] = $target;
 	}
-	protected static function has_many_to_many($key, $target, $key) {
+	protected static function has_many_to_many($key, $target, $foreign_key) {
 		$class = get_called_class();
-		$class::$_has_many_to_many[$key] = Hash::create(array('key' => $key, 'target' => $target));
+		$class::$_has_many_to_many[$key] = Hash::create(array('key' => $foreign_key, 'target' => $target));
 	}
 	
 	public static function define() {
@@ -212,12 +223,15 @@ abstract class MongoModel {
 			return null;
 	}
 	
-	public static function find_many($query = array(), $sort = null, $limit = 0) {
+	public static function find_many($query = array(), $sort = null, $limit = 0, $skip = 0) {
 		$class = get_called_class();
 		$collection = $class::_get_collection();
 		$cursor = $collection->find($class::_prepare_query($query));
 		if ($sort) {
 			$cursor->sort($sort);
+		}
+		if ($skip) {
+			$cursor->skip($skip);
 		}
 		if ($limit) {
 			$cursor->limit($limit);
@@ -255,18 +269,29 @@ abstract class MongoModel {
 		return $count;
 	}
 
-	public static function map_reduce($map, $reduce, $query = array()) {
+	public static function map_reduce($map, $reduce, $query = null, $merge = null) {
 		$db = $GLOBALS['db'];
 		$class = get_called_class();
 		
-		$reduced = $db->command(array(
+		
+		$command = array(
 		    'mapreduce' => $class::_get_collection_name(),
 		    'map' => $map,
-		    'reduce' => $reduce,
-			'query' => $query
-		));
+		    'reduce' => $reduce
+		);
+		if ($query)
+			$command['query'] = $query;
+		if ($merge)
+			$command['out'] = array('merge' => $merge);
+			
+		$reduced = $db->command($command);
 		
-		$results = $db->selectCollection($reduced['result'])->find();
+		if ($merge)
+			$results_collection = $merge;
+		else
+			$results_collection = $reduced['result'];
+		
+		$results = $db->selectCollection($results_collection)->find();
 		
 		$data = array();
 		foreach($results as $result) {
@@ -292,8 +317,22 @@ abstract class MongoModel {
 	}
 	
 	protected function _relationship_get_one($key) {
+		if (!isset($this->_data[$key]))
+			return null;
+
 		$class = get_called_class();
 		$target = $class::$_has_one[$key];
+		$id = $this->_data[$key];
+		return $target::find_by_id($id);
+	}
+
+	protected function _relationship_get_one_to_one($key) {
+		if (!isset($this->_data[$key]))
+			return null;
+		
+		$class = get_called_class();
+		$info = $class::$_has_one_to_one[$key];
+		$target = $info->target;
 		$id = $this->_data[$key];
 		return $target::find_by_id($id);
 	}
@@ -316,6 +355,42 @@ abstract class MongoModel {
 		return new MongoModel_ManyToManyRelationship($array, $this, $key, $info->target, $info->key);
 	}
 	
+	public function _relationship_set_one($key, $value) {
+		if (is_string($value) || is_bool($value) || is_numeric($value) || is_null($value))
+			$this->_data[$key] = $value;
+		else if ($value instanceof MongoModel)
+			$this->_data[$key] = $value->__get('id');
+		else
+			return false;
+	}
+	
+	public function _relationship_set_one_to_one($key, $value, $non_reciprocal = false) {
+		$class = get_called_class();
+		$info = $class::$_has_one_to_one[$key];
+
+		// unset old relationship first
+		$old_object = $this->_relationship_get_one_to_one($key);
+		if (!$non_reciprocal && $old_object instanceof MongoModel) {
+			$old_object->_relationship_set_one_to_one($key, null, true);
+			$old_object->save(true); // force saving in case a validation wouldn't allow for this. can't have dangling relationships
+		}
+		
+		if (is_string($value) || is_bool($value) || is_numeric($value) || is_null($value)) {
+			$this->_data[$key] = $value;
+		} else if ($value instanceof MongoModel) { // this is where the magic happens
+			$this->_data[$key] = $value->__get('id');
+			
+			if (!$non_reciprocal) { // set the other side of the relationship
+				$value->_relationship_set_one_to_one($info->key, $this, true);
+			}
+		} else {
+			return false;
+		}
+		
+		// TODO: figure out a way where this isn't necessary. ideally, keep track of deltas and objects to save and add them to a save pool.
+		$this->save();
+	}
+
 	public function array_push($key, $value) {
 		if (!isset($this->_data[$key]) || !is_array($this->_data[$key]))
 			$this->_data[$key] = array();
@@ -336,7 +411,7 @@ abstract class MongoModel {
 	public function __get($key) {
 		$class = get_called_class();
 		
-		if ($key == 'id') {
+		if ($key == 'id' && isset($this->_data['_id'])) {
 			return $this->_data['_id']->__toString();
 		} else if ($key == '_errors') {
 			return $this->_errors;
@@ -344,6 +419,8 @@ abstract class MongoModel {
 			return $class::validates();
 		} else if (isset($class::$_has_one[$key])) {
 			return $this->_relationship_get_one($key);
+		} else if (isset($class::$_has_one_to_one[$key])) {
+			return $this->_relationship_get_one_to_one($key);
 		} else if (isset($class::$_has_many[$key])) {
 			return $this->_relationship_get_many($key);
 		} else if (isset($class::$_has_many_to_many[$key])) {
@@ -358,14 +435,16 @@ abstract class MongoModel {
 
 		if ($key == '_errors') {
 			return;
-		} else if ($value instanceof MongoModel) {
-			$this->_data[$key] = $value->__get('id');
 		} else if (isset($class::$_has_one[$key])) {
-			return false;
+			return $this->_relationship_set_one($key, $value);
+		} else if (isset($class::$_has_one_to_one[$key])) {
+			return $this->_relationship_set_one_to_one($key, $value);
 		} else if (isset($class::$_has_many[$key])) {
 			return false;
 		} else if (isset($class::$_has_many_to_many[$key])) {
 			return false;
+		} else if ($value instanceof MongoModel) {
+			$this->_data[$key] = $value->__get('id');
 		} else {
 			$this->_data[$key] = $value;
 		}
@@ -375,7 +454,7 @@ abstract class MongoModel {
 	
 	// only works one level deep
 	public function is_set($key) {
-		return !empty($this->_data[$key]) ? true : false ;
+		return (!empty($this->_data[$key]) ? true : false);
 	}
 	
 	public function delete() {
@@ -437,6 +516,18 @@ abstract class MongoModel {
 			return false;
 		}
 	}
+	
+	final public function validate_numericality_of($key) {
+		if (!isset($this->_data[$key])) {
+			$this->_errors[$key] = 'must be present';
+			return false;
+		} else if (!is_numeric($this->_data[$key])) {
+			$this->_errors[$key] = 'must be be numeric';
+			return false;
+		} else {
+			return true;
+		}
+	}
 
 	final public function validate_uniqueness_of($key) {
 		$class = get_called_class();
@@ -464,6 +555,7 @@ abstract class MongoModel {
 		
 		// if got to here, all keys were empty
 		$this->_errors[implode('_', $array)] = 'one of these keys must be present: '.implode(', ', $array);
+		return false;
 	}
 
 	final public function validate_relationship($key, $model) {
