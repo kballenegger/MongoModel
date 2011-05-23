@@ -14,6 +14,7 @@ class RelationshipTestModel extends MongoModel {
 
 	public static function define() {
 		self::has_one('target', 'TestModel');
+		self::has_one_to_one('one_to_one_target', 'RelationshipTestModel', 'one_to_one_target'); // to itself for simplicity's sake
 		self::has_many('many_targets', 'TestModel');
 		self::has_many_to_many('many_to_many_targets', 'RelationshipTestModel', 'many_to_many_targets');
 	}
@@ -22,7 +23,8 @@ class RelationshipTestModel extends MongoModel {
 		parent::validate();
 		//$this->validate_relationship('target', 'TestModel');
 	}
-} RelationshipTestModel::define();
+}
+RelationshipTestModel::define();
 
 class ModelTester extends Tester {
 		
@@ -101,6 +103,34 @@ class ModelTester extends Tester {
 			throw new TestError('Error retrieving relationship target.'."\n".var_export($relationship_model->target, true));
 		
 		$model->delete();
+		$relationship_model->delete();
+	}
+
+	public static function test_relationship_has_one_to_one() {
+		self::depends_on('adding');
+		self::depends_on('relationship_has_one');
+
+		$relationship_model = new RelationshipTestModel;
+		$relationship_model->save();
+
+		$relationship_model2 = new RelationshipTestModel;
+		$relationship_model2->save();
+
+		$relationship_model->one_to_one_target = $relationship_model2;
+
+		// relationship models implicitly saved
+		$relationship_model->save();
+		
+		$relationship_model = RelationshipTestModel::find_by_id($relationship_model->id);
+		$relationship_model2 = RelationshipTestModel::find_by_id($relationship_model2->id);
+		
+		if (!$relationship_model->one_to_one_target->id == $relationship_model2->id)
+			throw new TestError('One-to-one relationship target invalid.');
+		
+		if (!$relationship_model2->one_to_one_target->id == $relationship_model->id)
+			throw new TestError('Inverse one-to-one relationship target invalid.');
+		
+		$relationship_model2->delete();
 		$relationship_model->delete();
 	}
 	
