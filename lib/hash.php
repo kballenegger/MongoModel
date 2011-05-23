@@ -26,8 +26,10 @@ class Hash {
 				}
 			}
 			return $object; 
+		} else if (is_array($array) && count($array) == 0) {
+			return new Hash;
 		} else {
-			return FALSE;
+			return null;
 		}
 	}
 }
