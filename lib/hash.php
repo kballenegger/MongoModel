@@ -20,7 +20,7 @@ class Hash {
 		$object = new Hash();
 		if (is_array($array) && count($array) > 0) {
 			foreach ($array as $name=>$value) {
-				$name = strtolower(trim($name));
+				$name = trim($name); // no strtolower, but please use lowercase, it's prettier.
 				if (!empty($name)) {
 					$object->$name = Hash::_array_to_object($value);
 				}
