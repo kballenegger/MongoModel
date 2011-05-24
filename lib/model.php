@@ -371,7 +371,7 @@ abstract class MongoModel {
 		// unset old relationship first
 		$old_object = $this->_relationship_get_one_to_one($key);
 		if (!$non_reciprocal && $old_object instanceof MongoModel) {
-			$old_object->_relationship_set_one_to_one($key, null, true);
+			$old_object->_relationship_set_one_to_one($info->key, null, true);
 			$old_object->save(true); // force saving in case a validation wouldn't allow for this. can't have dangling relationships
 		}
 		
