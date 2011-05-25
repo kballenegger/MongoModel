@@ -181,19 +181,23 @@ abstract class MongoModel {
 	
 	protected static function has_one($key, $target) {
 		$class = get_called_class();
-		$class::$_has_one[$key] = $target;
+		if (!isset(self::$_has_one[$class])) self::$_has_one[$class] = array();
+		self::$_has_one[$class][$key] = $target;
 	}
 	protected static function has_one_to_one($key, $target, $foreign_key) {
 		$class = get_called_class();
-		$class::$_has_one_to_one[$key] = Hash::create(array('key' => $foreign_key, 'target' => $target));
+		if (!isset(self::$_has_one_to_one[$class])) self::$_has_one_to_one[$class] = array();
+		self::$_has_one_to_one[$class][$key] = Hash::create(array('key' => $foreign_key, 'target' => $target));
 	}
 	protected static function has_many($key, $target) {
 		$class = get_called_class();
-		$class::$_has_many[$key] = $target;
+		if (!isset(self::$_has_many[$class])) self::$_has_many[$class] = array();
+		self::$_has_many[$class][$key] = $target;
 	}
 	protected static function has_many_to_many($key, $target, $foreign_key) {
 		$class = get_called_class();
-		$class::$_has_many_to_many[$key] = Hash::create(array('key' => $foreign_key, 'target' => $target));
+		if (!isset(self::$_has_many_to_many[$class])) self::$_has_many_to_many[$class] = array();
+		self::$_has_many_to_many[$class][$key] = Hash::create(array('key' => $foreign_key, 'target' => $target));
 	}
 	
 	public static function define() {
@@ -273,7 +277,6 @@ abstract class MongoModel {
 		$db = $GLOBALS['db'];
 		$class = get_called_class();
 		
-		
 		$command = array(
 		    'mapreduce' => $class::_get_collection_name(),
 		    'map' => $map,
@@ -281,17 +284,23 @@ abstract class MongoModel {
 		);
 		if ($query)
 			$command['query'] = $query;
+		
 		if ($merge)
 			$command['out'] = array('merge' => $merge);
+		else
+			$command['out'] = array('inline' => 1);
 			
 		$reduced = $db->command($command);
 		
 		if ($merge)
 			$results_collection = $merge;
+		else if (isset($reduced['results']))
+			$results = $reduced['results'];
 		else
-			$results_collection = $reduced['result'];
+			return false;
 		
-		$results = $db->selectCollection($results_collection)->find();
+		if (!$results)
+			$results = $db->selectCollection($results_collection)->find();
 		
 		$data = array();
 		foreach($results as $result) {
@@ -321,7 +330,7 @@ abstract class MongoModel {
 			return null;
 
 		$class = get_called_class();
-		$target = $class::$_has_one[$key];
+		$target = self::$_has_one[$class][$key];
 		$id = $this->_data[$key];
 		return $target::find_by_id($id);
 	}
@@ -331,7 +340,7 @@ abstract class MongoModel {
 			return null;
 		
 		$class = get_called_class();
-		$info = $class::$_has_one_to_one[$key];
+		$info = self::$_has_one_to_one[$class][$key];
 		$target = $info->target;
 		$id = $this->_data[$key];
 		return $target::find_by_id($id);
@@ -339,7 +348,7 @@ abstract class MongoModel {
 
 	protected function _relationship_get_many($key) {
 		$class = get_called_class();
-		$target = $class::$_has_many[$key];
+		$target = self::$_has_many[$class][$key];
 		$array = array();
 		if (isset($this->_data[$key]))
 			$array = $this->_data[$key];
@@ -348,7 +357,7 @@ abstract class MongoModel {
 
 	protected function _relationship_get_many_to_many($key) {
 		$class = get_called_class();
-		$info = $class::$_has_many_to_many[$key];
+		$info = self::$_has_many_to_many[$class][$key];
 		$array = array();
 		if (isset($this->_data[$key]))
 			$array = $this->_data[$key];
@@ -366,7 +375,7 @@ abstract class MongoModel {
 	
 	public function _relationship_set_one_to_one($key, $value, $non_reciprocal = false) {
 		$class = get_called_class();
-		$info = $class::$_has_one_to_one[$key];
+		$info = self::$_has_one_to_one[$class][$key];
 
 		// unset old relationship first
 		$old_object = $this->_relationship_get_one_to_one($key);
@@ -417,13 +426,13 @@ abstract class MongoModel {
 			return $this->_errors;
 		} else if ($key == 'validates') { // property -> function mapping
 			return $class::validates();
-		} else if (isset($class::$_has_one[$key])) {
+		} else if (isset(self::$_has_one[$class][$key])) {
 			return $this->_relationship_get_one($key);
-		} else if (isset($class::$_has_one_to_one[$key])) {
+		} else if (isset(self::$_has_one_to_one[$class][$key])) {
 			return $this->_relationship_get_one_to_one($key);
-		} else if (isset($class::$_has_many[$key])) {
+		} else if (isset(self::$_has_many[$class][$key])) {
 			return $this->_relationship_get_many($key);
-		} else if (isset($class::$_has_many_to_many[$key])) {
+		} else if (isset(self::$_has_many_to_many[$class][$key])) {
 			return $this->_relationship_get_many_to_many($key);
 		} else if (isset($this->_data[$key])) {
 			return $this->_data[$key];
@@ -435,13 +444,13 @@ abstract class MongoModel {
 
 		if ($key == '_errors') {
 			return;
-		} else if (isset($class::$_has_one[$key])) {
+		} else if (isset(self::$_has_one[$class][$key])) {
 			return $this->_relationship_set_one($key, $value);
-		} else if (isset($class::$_has_one_to_one[$key])) {
+		} else if (isset(self::$_has_one_to_one[$class][$key])) {
 			return $this->_relationship_set_one_to_one($key, $value);
-		} else if (isset($class::$_has_many[$key])) {
+		} else if (isset(self::$_has_many[$class][$key])) {
 			return false;
-		} else if (isset($class::$_has_many_to_many[$key])) {
+		} else if (isset(self::$_has_many_to_many[$class][$key])) {
 			return false;
 		} else if ($value instanceof MongoModel) {
 			$this->_data[$key] = $value->__get('id');
