@@ -299,7 +299,7 @@ abstract class MongoModel {
 		else
 			return false;
 		
-		if (!$results)
+		if ($merge)
 			$results = $db->selectCollection($results_collection)->find();
 		
 		$data = array();
