@@ -51,43 +51,70 @@ abstract class Tester {
 	final public static function _test_single($test) {
 		$class = get_called_class();
 		
-		if (isset($class::$_tests_history[$test])) {
+		$prefix = 'test_';
+		$actual_test = true;
+		
+		// run pre / post normally
+		if ($test == 'pre_test' || $test == 'post_test') {
+			$prefix = '';
+			$actual_test = false;
+		}
+		
+		
+		if ($actual_test && isset($class::$_tests_history[$test])) {
 			TerminalColor::out('yellow', 'Test already run: `'.$test.'`'."\n");
-			return;
+			return false;
 		}
 
 		$class::$_tests_history[$test] = array(
 				'running' => true
 			);
 
-		$success = false;
+		$success = true; // assume success
+		
+		// run pre
+		if ($actual_test && method_exists($class, 'pre_test')) {
+			$success *= self::_test_single('pre_test');
+		}
 
-		if (method_exists($class, 'test_'.$test)) {
+		if (method_exists($class, $prefix.$test) && $success) {
 			
-			echo "\n".'Testing: `'.$test.'`'."\n";
+			if ($actual_test) echo "\n".'Testing: `'.$test.'`'."\n";
 			try {
-				call_user_func($class.'::test_'.$test);
+				TerminalColor::yellow();
+				call_user_func($class.'::'.$prefix.$test);
+				TerminalColor::reset();
 				$description = 'Test passed: `'.$test.'`';
 				$class::$_tests_history[$test]['description'] = $description;
-				TerminalColor::out('green', $description."\n");
-				$success = true;
+				if ($actual_test) TerminalColor::out('green', $description."\n");
+				$success *= true;
 			} catch (TestDependencyError $e) {
 				$dependency = $e->test;
 				$description = 'Test `'.$test.'` failed due to dependency on: `'.$dependency.'`'."\n";
 				$class::$_tests_history[$test]['description'] = $description;
 				TerminalColor::out('red', $description."\n");
-				$success = false;
+				$success *= false;
 			} catch (TestError $e) {
 				$description = 'Test failed: `'.$test.'`'."\n".$e->getMessage();
 				$class::$_tests_history[$test]['description'] = $description;
 				TerminalColor::out('red', $description."\n");
-				$success = false;
+				$success *= false;
 			}
+		} else if($success == false) {
+			$description =  'Looks like pre_test failed...';
+			$class::$_tests_history[$test]['description'] = $description;
+			TerminalColor::out('red', $description."\n");
+			$success *= false;
 		} else {
 			$description =  'Can\'t find test `'.$test.'`.';
 			$class::$_tests_history[$test]['description'] = $description;
-			TerminalColor::out('yellow', $description."\n");
-			$success = false;
+			TerminalColor::out('red', $description."\n");
+			$success *= false;
+		}
+
+		// run post
+		if ($actual_test && method_exists($class, 'post_test')) {
+			$success *= self::_test_single('post_test');
 		}
 
 		$class::$_tests_history[$test]['success'] = $success;
@@ -130,28 +157,39 @@ abstract class Tester {
 		return $tests;
 	}
 	
-	final public static function run_all_tests() {
+	final public static function run_tests($tests = array()) {
 		
 		$success = true;
 		
-		if ($handle = opendir($GLOBALS['tests_path'])) {
-			while (false !== ($file = readdir($handle))) {
-				if (preg_match('/^([a-z]+)\.php$/', $file, $matches)) {
-					require_once $GLOBALS['tests_path'].$file;
-					$class = underscore_to_camel_case($matches[1]).'Tester';
-					$success *= $class::test();
-					echo "\n".'---'."\n\n";
-				}
-			}
-			closedir($handle);
-		} else {
-			$success = false;
+		foreach ($tests as $test) {
+			require_once APP_PATH.'tests/'.$test.'.php';
+			$class = CaseConversion::underscore_to_camel_case($test).'Tester';
+			$success *= $class::test();
+			echo "\n".'---'."\n\n";
 		}
 		
 		if ($success) {
 			TerminalColor::out('green', 'TESTS PASSED'."\n");
 		} else {
 			TerminalColor::out('red', 'TESTS FAILED'."\n");
+		}
+		return $success;
+	}
+	
+	final public static function run_all_tests() {
+		$success = true;
+		
+		if ($handle = opendir(APP_PATH.'tests')) {
+			$tests = array();
+			while (false !== ($file = readdir($handle))) {
+				if (preg_match('/^([a-z_]+)\.php$/', $file, $matches)) {
+					$tests[] = $matches[1];
+				}
+			}
+			closedir($handle);
+			$success *= self::run_tests($tests);
+		} else {
+			TerminalColor::out('red', 'Couldn\'t open test directory'."\n");
 		}
 		return $success;
 	}
