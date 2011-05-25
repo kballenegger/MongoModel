@@ -3,9 +3,9 @@
 class TerminalColor {
 	
 	// values
-	public static $yellow = "\033[1;33;40m";
-	public static $red = "\033[1;31;40m";
-	public static $green = "\033[1;32;40m";
+	public static $yellow = "\033[1;33m";
+	public static $red = "\033[1;31m";
+	public static $green = "\033[1;32m";
 
 	public static $reset = "\033[00m";
 	
