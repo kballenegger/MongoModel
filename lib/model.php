@@ -664,17 +664,29 @@ abstract class MongoModel {
 	 * @return array of MongoModel - may also return null / false
 	 * @author Kenneth Ballenegger
 	 */
-	public static function find_many_cached($query = array()) {
+	public static function find_many_cached($query = array(), $sort = null, $limit = 0, $skip = 0) {
 		$class = get_called_class();
 		$collection = $class::_get_collection();
 		
 		ksort($query);
 		$hash = md5(serialize($query));
+		$hash .= md5(serialize($sort));
+		$hash .= md5(serialize($limit));
+		$hash .= md5(serialize($skip));
 		$key = $class.'::find_many::'.$hash;
 
 		$ids = $class::_cache_get($key);
 		if (!$ids || !is_array($ids)) {
 			$ids_cursor = $collection->find($class::_prepare_query($query), array('_id' => 1));
+			if ($sort) {
+				$ids_cursor->sort($sort);
+			}
+			if ($skip) {
+				$ids_cursor->skip($skip);
+			}
+			if ($limit) {
+				$ids_cursor->limit($limit);
+			}
 			
 			$ids = array();
 			foreach ($ids_cursor as $id_data) {
@@ -690,7 +702,7 @@ abstract class MongoModel {
 			if (!empty($ids))
 				$class::_cache_set($ids, $key);
 			else
-				return false;
+				return array();
 		}
 
 		$objects = array();
