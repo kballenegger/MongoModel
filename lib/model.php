@@ -629,13 +629,14 @@ abstract class MongoModel {
 		$class = get_called_class();
 		$collection = $class::_get_collection();
 		
+		$query = $class::_prepare_query($query);
 		ksort($query);
 		$hash = md5(serialize($query));
 		$key = $class.'::find_one::'.$hash;
 
 		$id = $class::_cache_get($key);
 		if (!$id) {
-			$id_data = $collection->findOne($class::_prepare_query($query), array('_id' => 1));
+			$id_data = $collection->findOne($query, array('_id' => 1));
 
 			if (!isset($id_data['_id']))
 				$id = null;
@@ -668,6 +669,7 @@ abstract class MongoModel {
 		$class = get_called_class();
 		$collection = $class::_get_collection();
 		
+		$query = $class::_prepare_query($query);
 		ksort($query);
 		$hash = md5(serialize($query));
 		$hash .= md5(serialize($sort));
@@ -677,7 +679,7 @@ abstract class MongoModel {
 
 		$ids = $class::_cache_get($key);
 		if (!$ids || !is_array($ids)) {
-			$ids_cursor = $collection->find($class::_prepare_query($query), array('_id' => 1));
+			$ids_cursor = $collection->find($query, array('_id' => 1));
 			if ($sort) {
 				$ids_cursor->sort($sort);
 			}
