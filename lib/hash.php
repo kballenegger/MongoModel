@@ -1,7 +1,5 @@
 <?php
 
-define('_HASH', true);
-
 function is_assoc ($arr) {
     return (is_array($arr) && count(array_filter(array_keys($arr),'is_string')) == count($arr));
 }

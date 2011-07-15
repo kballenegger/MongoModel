@@ -8,12 +8,19 @@ define('TEST_PATH', dirname(__FILE__).'/');
  *
  */
 
-define('_TEST', true);
+spl_autoload_register(function($class_name) {
+	$class_name = preg_replace('/(?<=\\w)(?=[A-Z])/',"_$1", $class_name);
+	$class_name = strtolower($class_name);
+	$path = TEST_PATH.$class_name.'.php';
 
-if (!defined('_CASE_CONVERSION'))
-	require_once TEST_PATH.'case_conversion.php';
-if (!defined('_TERMINAL_COLOR'))
-	require_once TEST_PATH.'terminal_color.php';
+	if (file_exists($path)) {
+		require_once $path;
+		return true;
+	} else {
+		return false;
+	}
+});
+
 
 class TestError extends Exception {}
 
@@ -162,7 +169,7 @@ abstract class Tester {
 		$success = true;
 		
 		foreach ($tests as $test) {
-			require_once APP_PATH.'tests/'.$test.'.php';
+			require_once TEST_PATH.'../tests/'.$test.'.php';
 			$class = CaseConversion::underscore_to_camel_case($test).'Tester';
 			$success *= $class::test();
 			echo "\n".'---'."\n\n";
@@ -179,7 +186,7 @@ abstract class Tester {
 	final public static function run_all_tests() {
 		$success = true;
 		
-		if ($handle = opendir(APP_PATH.'tests')) {
+		if ($handle = opendir(TEST_PATH.'../tests')) {
 			$tests = array();
 			while (false !== ($file = readdir($handle))) {
 				if (preg_match('/^([a-z_]+)\.php$/', $file, $matches)) {
