@@ -10,6 +10,10 @@ class Hash {
 		return self::_array_to_object($array);
 	}
 
+    public function is_set($key) {
+        return isset($this->$key);
+    }
+
 	protected static function _array_to_object($array) {
 		if(!is_assoc($array)) {
 			return $array;
