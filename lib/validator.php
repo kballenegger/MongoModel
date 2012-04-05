@@ -7,7 +7,7 @@
 	address format and the domain exists.
 */
 
-class Valdator {
+class Validator {
 
 	public static function email($email)
 	{
