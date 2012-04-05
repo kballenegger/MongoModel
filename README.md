@@ -5,7 +5,9 @@ MongoModel is a simple and lightweight ORM for MongoDB and PHP.
 # Installation & Usage
 
 
-## This is required for opening up the connection. Put this in your config.php or whatever.
+### Setup
+
+This is required for opening up the connection. Put this in your config.php or whatever.
     
     $mongo_host = 'localhost';
     $mongo_port = 27017;
@@ -16,7 +18,7 @@ MongoModel is a simple and lightweight ORM for MongoDB and PHP.
     require_once 'model.php';
     
     
-## This is how you write a model.
+This is how you write a model.
     
     class Example extends MongoModel {
     	
@@ -25,9 +27,9 @@ MongoModel is a simple and lightweight ORM for MongoDB and PHP.
     }
     
     
-## This is how you use the model.
-    
-### Creating objects
+### Usage
+
+#### Creating objects
     
     // One method
     $example_1 = Example::add(array(
@@ -46,7 +48,7 @@ MongoModel is a simple and lightweight ORM for MongoDB and PHP.
     var_dump($example_2->_id); // `_id` contains a MongoID.
     var_dump($example_2->id); // `id` is the string representation of the Mongo ID.
     
-### Querying objects
+#### Querying objects
     
     // Find many
     $examples_3 = Example::find_many(array('textfield' => 'something'));
@@ -66,9 +68,10 @@ MongoModel is a simple and lightweight ORM for MongoDB and PHP.
     // Find by ID
     $example_6 = Example::find_by_id($example_2->id);
     
-### Modifying objects
+#### Modifying objects
     $example_6->textfield = 'something else'; 
     $example_6->save();
+
 
 **Check out sample.php for more detailed examples.**
 
