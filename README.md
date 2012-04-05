@@ -2,6 +2,8 @@
 
 MongoModel is a simple and lightweight ORM for MongoDB and PHP.
 
+Like Mongo, it is schema-less. It lets you build native PHP model objects, while automatically taking care of Mongo persistence for you. It also takes care of tricky common problems for you: *relationships*,  *caching* and *validations*.
+
 # Installation & Usage
 
 
@@ -31,46 +33,38 @@ This is how you write a model.
 
 #### Creating objects
     
-    // One method
-    $example_1 = Example::add(array(
-    		'textfield' => 'something',
-    		'numberfield' => 1234,
-    		'arrayfield' => array(1, 2, 3, 4),
-    		'hashfield' => array('one' => 1, 'two' => 2)
-    	));
-    
     // Another method
-    $example_2 = new Example;
-    $example_2->textfield = 'something';
-    $example_2->numberfield = 4567;
-    $example_2->save();
+    $example_1 = new Example;
+    $example_1->textfield = 'something';
+    $example_1->numberfield = 4567;
+    $example_1->save();
     
-    var_dump($example_2->_id); // `_id` contains a MongoID.
-    var_dump($example_2->id); // `id` is the string representation of the Mongo ID.
+    var_dump($example_1->_id); // `_id` contains a MongoID.
+    var_dump($example_1->id); // `id` is the string representation of the Mongo ID.
     
 #### Querying objects
     
     // Find many
-    $examples_3 = Example::find_many(array('textfield' => 'something'));
+    $examples_2 = Example::find_many(array('textfield' => 'something'));
     // Use any type of Mongo query here. See Mongo docs for more examples.
     
-    var_dump($examples_3); // Is an array of Example objects.
+    var_dump($examples_2); // Is an array of Example objects.
     
     // Find one
-    $example_4 = Example::find_one(array('numberfield' => 4567));
+    $example_3 = Example::find_one(array('numberfield' => 4567));
     // If more than one match exist, the first one is returned.
     
-    var_dump($example_4); // Is an Example object.
+    var_dump($example_3); // Is an Example object.
     
-    $example_5 = Example::find_one(array('id' => $example_2->id, 'textfield' => 'something'));
+    $example_4 = Example::find_one(array('id' => $example_1->id, 'textfield' => 'something'));
     // If you use `id` in a query, MongoModel will automatically translate it to `_id` as a MongoID object.
     
     // Find by ID
-    $example_6 = Example::find_by_id($example_2->id);
+    $example_5 = Example::find_by_id($example_1->id);
     
 #### Modifying objects
-    $example_6->textfield = 'something else'; 
-    $example_6->save();
+    $example_5->textfield = 'something else'; 
+    $example_5->save();
 
 
 **Check out sample.php for more detailed examples.**
