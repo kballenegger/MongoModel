@@ -10,6 +10,7 @@
 
 define('MONGOMODEL_PATH', dirname(__FILE__).'/');
 define('MONGOMODEL_SAVE_IMPLICITLY', false);
+define('MONGOMODEL_CACHE_EXPIRATION', 60); // 1 minute
 
 /*
  *
@@ -17,14 +18,20 @@ define('MONGOMODEL_SAVE_IMPLICITLY', false);
  *
  */
 
-define('_MONGOMODEL', true);
+spl_autoload_register(function($class_name) {
+	$class_name = preg_replace('/(?<=\\w)(?=[A-Z])/',"_$1", $class_name);
+	$class_name = strtolower($class_name);
+	$path = MONGOMODEL_PATH.$class_name.'.php';
 
-if (!defined('_CASE_CONVERSION'))
-	require_once MONGOMODEL_PATH.'case_conversion.php';
-if (!defined('_EMAIL_VALIDATION'))
-	require_once MONGOMODEL_PATH.'email_validation.php';
-if (!defined('_HASH'))
-	require_once MONGOMODEL_PATH.'hash.php';
+	if (file_exists($path)) {
+		require_once $path;
+		return true;
+	} else {
+		return false;
+	}
+});
+
+
 
 class MongoModel_OneToManyRelationship implements Iterator {
 	public $ids = array();
@@ -156,6 +163,7 @@ abstract class MongoModel {
 	 * @author Kenneth Ballenegger
 	 */
 	final protected static function _replace_mongo_id_recursively(&$array) {
+        if (empty($array)) return;
 		foreach ($array as $key => $value) {
 			if (is_array($value)) {
 				MongoModel::_replace_mongo_id_recursively($value);
@@ -183,7 +191,7 @@ abstract class MongoModel {
 		if (isset($class::$_collection) && $class::$_collection!=null) {
 			$_collection = $class::$_collection;
 		} else {
-			$_collection = camel_case_to_underscore($class).'s';
+			$_collection = CaseConversion::camel_case_to_underscore($class).'s';
 		}
 		return $_collection;
 	}
@@ -212,12 +220,13 @@ abstract class MongoModel {
 	 * @author Kenneth Ballenegger
 	 */
 	protected static function _get_db($preference = null) {
-	    if ($preference && isset($GLOBALS['db_'.$preference]))
+	    if ($preference && isset($GLOBALS['db_'.$preference])) {
 	        return $GLOBALS['db_'.$preference];
-        else if (isset($GLOBALS['db']))
-            RETURN $GLOBALS['db'];
-        else
+        } else if (isset($GLOBALS['db'])) {
+            return $GLOBALS['db'];
+        } else {
             return null;
+        }
 	}
 	
 	protected static function has_one($key, $target) {
@@ -310,7 +319,7 @@ abstract class MongoModel {
 	public static function count($query = null) {
 		$class = get_called_class();
 		$collection = $class::_get_collection('read');
-		$count = $collection->count($query);
+		$count = $collection->count($class::_prepare_query($query));
 		return $count;
 	}
 
@@ -373,6 +382,9 @@ abstract class MongoModel {
 			$this->_data[$key] = $value;
 		}
 	}
+	
+	
+	// Relationship stuff
 	
 	protected function _relationship_get_one($key) {
 		if (!isset($this->_data[$key]))
@@ -460,6 +472,9 @@ abstract class MongoModel {
 		// TODO: figure out a way where this isn't necessary. ideally, keep track of deltas and objects to save and add them to a save pool.
 		$this->save();
 	}
+	
+	
+	// Helpers
 
 	public function array_push($key, $value) {
 		if (!isset($this->_data[$key]) || !is_array($this->_data[$key]))
@@ -477,6 +492,52 @@ abstract class MongoModel {
 			$this->_data[$key] = $array;
 		}
 	}
+	
+	/**
+	 * Returns an array of properties, as requested in the keys param.
+	 * Note: this will fetch relationships.
+	 * 
+	 * @param	array $keys of keys
+	 * @return	array of key-value pairs
+	 * @author Kenneth Ballenegger
+	 */
+	public function extract_keys($keys) {
+		if (!is_array($keys)) return array();
+		
+		$array = array();
+		foreach ($keys as $key) {
+			$val = $this->__get($key);
+			if ($val)
+				$array[$key] = $val;
+		}
+		return $array;
+	}
+
+	// only works one level deep
+	public function is_set($key) {
+		return (!empty($this->_data[$key]) ? true : false);
+	}
+	
+	public function dealloc($key) { // Because I can't call it unset(). PHP core lib is a piece of shit. Dammit! 
+		unset($this->_data[$key]);
+	}
+	
+	public function __destruct() {
+		unset($this->_data);
+		unset($this->date_modified_override);
+		unset($this->_errors);
+		unset($this->_relationship_object_cache);
+	}
+	
+	public function __toArray() {
+		$response = $this->_data;
+		unset($response['_id']);
+		$response['id'] = $this->id;
+		return $response;
+	}
+	
+	
+	// Accessors
 	
 	public function __get($key) {
 		$class = get_called_class();
@@ -522,35 +583,6 @@ abstract class MongoModel {
 			$this->save();
 	}
 	
-	/**
-	 * Returns an array of properties, as requested in the keys param.
-	 * Note: this will fetch relationships.
-	 * 
-	 * @param	array $keys of keys
-	 * @return	array of key-value pairs
-	 * @author Kenneth Ballenegger
-	 */
-	public function extract_keys($keys) {
-		if (!is_array($keys)) return array();
-		
-		$array = array();
-		foreach ($keys as $key) {
-			$val = $this->__get($key);
-			if ($val)
-				$array[$key] = $val;
-		}
-		return $array;
-	}
-
-	// only works one level deep
-	public function is_set($key) {
-		return (!empty($this->_data[$key]) ? true : false);
-	}
-	
-	public function dealloc($key) { // Because I can't call it unset(). PHP core lib is a piece of shit. Dammit! 
-		unset($this->_data[$key]);
-	}
-	
 	public function delete() {
 		$class = get_called_class();
 		$collection = $class::_get_collection();
@@ -576,13 +608,232 @@ abstract class MongoModel {
 		}
 	}
 	
-	public function __toArray() {
-		$response = $this->_data;
-		unset($response['_id']);
-		$response['id'] = $this->id;
-		return $response;
+	
+	// Caching
+	
+	/**
+	 * Read a key from the cache
+	 *
+	 * @param string $key 
+	 * @return MongoModel
+	 * @author Kenneth Ballenegger
+	 */
+	protected static function _cache_get($key) {
+		$cache = isset($GLOBALS['cache']) ? $GLOBALS['cache'] : null;
+		if (!$cache)
+			return false;
+		$obj = $cache->get($key);
+		return $obj;
 	}
 	
+	/**
+	 * Write an object to the cache
+	 *
+	 * @param mixed $data 
+	 * @param string $key 
+	 * @return bool
+	 * @author Kenneth Ballenegger
+	 */
+	protected static function _cache_set($data, $key) {
+
+		$cache = isset($GLOBALS['cache']) ? $GLOBALS['cache'] : null;
+		if (!$cache)
+			return false;
+		return $cache->set($key, $data, 0, MONGOMODEL_CACHE_EXPIRATION);
+	}
+	
+	/**
+	 * Remove a cached key
+	 *
+	 * @param string $key 
+	 * @return mixed - cached value
+	 * @author Kenneth Ballenegger
+	 */
+	protected static function _cache_delete($key) {
+		
+		$cache = isset($GLOBALS['cache']) ? $GLOBALS['cache'] : null;
+		if (!$cache)
+			return false;
+		return $cache->delete($key);
+	}
+	
+	/**
+	 * Find one using cache (caches the query result and the data separately)
+	 *
+	 * WARNING: This cache is not automatically invalidated
+	 * Note: Uses a covered index where possible
+	 *
+	 * @param array $query 
+	 * @return MongoModel - may also return null / false
+	 * @author Kenneth Ballenegger
+	 */
+	public static function find_one_cached($query = array()) {
+		$class = get_called_class();
+		$query = $class::_prepare_query($query);
+		ksort($query);
+		$hash = md5(serialize($query));
+		$key = $class.'::find_one::'.$hash;
+
+		$id = $class::_cache_get($key);
+		if ($id == false) {
+			$collection = $class::_get_collection('read');
+			$id_data = $collection->findOne($query, array('_id' => 1));
+
+			if (!isset($id_data['_id']))
+				$id = null;
+			else if ($id_data['_id'] instanceof MongoID)
+				$id = $id_data['_id']->__toString();
+			else
+				$id = $id_data['_id'];
+
+			if ($id)
+				$class::_cache_set($id, $key);
+			else
+				return false;
+		}
+		$is_global_query = (isset($query['_globally'])) ? true : false;
+		$object = $class::find_by_id_cached($id, $is_global_query);
+		return $object;
+	}
+	
+	/**
+	 * Find many using cache (caches the query result and the data separately)
+	 *
+	 * WARNING: This cache is not automatically invalidated
+	 * Note: Uses a covered index where possible
+	 *
+	 * @param array $query 
+	 * @return array of MongoModel - may also return null / false
+	 * @author Kenneth Ballenegger
+	 */
+	public static function find_many_cached($query = array(), $sort = null, $limit = 0, $skip = 0) {
+		
+		$class = get_called_class();
+		$query = $class::_prepare_query($query);
+		
+		ksort($query);
+		$hash = md5(serialize($query));
+		$hash .= md5(serialize($sort));
+		$hash .= md5(serialize($limit));
+		$hash .= md5(serialize($skip));
+		$key = $class.'::find_many::'.$hash;
+
+		$ids = $class::_cache_get($key);
+		if ($ids == false) {
+			$collection = $class::_get_collection('read');
+			$ids_cursor = $collection->find($query, array('_id' => 1));
+			if ($sort) {
+				$ids_cursor->sort($sort);
+			}
+			if ($skip) {
+				$ids_cursor->skip($skip);
+			}
+			if ($limit) {
+				$ids_cursor->limit($limit);
+			}
+			
+			$ids = array();
+			foreach ($ids_cursor as $id_data) {
+				if (!isset($id_data['_id'])) {
+					// do nothing
+				} else if ($id_data['_id'] instanceof MongoID) {
+					$ids[] = $id_data['_id']->__toString();
+				} else {
+					$ids[] = $id_data['_id'];
+				}
+			}
+			
+			if (empty($ids)) // if there are no results, still store this in memcache
+				$ids = -1;
+				
+			$class::_cache_set($ids, $key);
+		}
+		$objects = array();
+		if ($ids == -1) // if -1, there are no objects, return immediately
+			return $objects;
+		
+		$is_global_query = (isset($query['_globally'])) ? true : false;
+		foreach ($ids as $id)
+			$objects[] = $class::find_by_id_cached($id, $is_global_query);
+		return $objects;
+	}
+	
+	/**
+	 * Find by id using cache
+	 *
+	 * @param string $id 
+	 * @return MongoModel - may also return null / false
+	 * @author Kenneth Ballenegger
+	 */
+	public static function find_by_id_cached($id, $is_global_query=false) {
+		$class = get_called_class();
+		$key = $class.'::id::'.$id;
+		
+		$data = $class::_cache_get($key);
+		if ($data == false) {
+			if ($is_global_query)
+				$object = $class::find_by_id_globally($id);
+			else
+				$object = $class::find_by_id($id);
+			
+			if ($object) {
+				$data = $object->_data;
+				$class::_cache_set($data, $key);
+			}
+		} else {
+			$object = new $class;
+			$object->_init_data($data);
+		}
+		
+		return $object;
+	}
+	
+	// turns a group of mongomodel objects into an assocative array
+	public static function assoc($objects) {
+		$objects_assoc = array();
+		foreach($objects as $object) {
+			$objects_assoc[$object->id] = $object;	
+		}
+		return $objects_assoc;
+	}
+	
+	/**
+	 * Count query using cache
+	 *
+	 * @param array $query 
+	 * @return int
+	 * @author Kenneth Ballenegger
+	 */
+	public static function count_cached($query = array()) {
+		$class = get_called_class();
+
+		ksort($query);
+		$hash = md5(serialize($query));
+		$key = $class.'::count::'.$hash;
+
+		$count = $class::_cache_get($key);
+		if (!$count) {
+			$count = $class::count($query);
+			$class::_cache_set($count, $key);
+		}
+		return $count;
+	}
+	
+	/**
+	 * Saves the object to the cache, by id
+	 *
+	 * @return void
+	 * @author Kenneth Ballenegger
+	 */
+	public function cache_save() {
+		$class = get_called_class();
+		$id = $this->id;
+		$key = $class.'::id::'.$id;
+		
+		$class::_cache_set($this, $key);
+	}
+	
+
 	// Validations
 	
 	final public function validates() {
@@ -651,6 +902,18 @@ abstract class MongoModel {
 		$this->_errors[implode('_', $array)] = 'one of these keys must be present: '.implode(', ', $array);
 		return false;
 	}
+    
+	final public function validate_arrayness_of($key) {
+		if (empty($this->_data[$key])) {
+			$this->_errors[$key] = 'must be present';
+			return false;
+		} else if (!is_array($this->_data[$key])) {
+			$this->_errors[$key] = 'must be an array';
+			return false;
+		} else {
+			return true;
+		}
+	}
 
 	final public function validate_relationship($key, $model) {
 		if (empty($this->_data[$key])) {
@@ -668,8 +931,8 @@ abstract class MongoModel {
 		if (empty($this->_data[$key])) {
 			$this->_errors[$key] = 'must be present';
 			return false;
-		} else if (!validate_email($this->_data[$key])) {
-			$this->_errors[$key] = 'must be be a valid email address';
+		} else if (!Validator::email($this->_data[$key])) {
+			$this->_errors[$key] = 'must be a valid email address';
 			return false;
 		} else {
 			return true;
